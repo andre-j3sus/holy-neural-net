@@ -1,10 +1,9 @@
+import math
+
+
 class Value:
     """
     Stores a single scalar value and its gradient.
-
-    :param data: The value of the scalar
-    :param _children: The nodes that this node depends on
-    :param _op: The operation that was performed to create this node
 
     :ivar data: The value of the scalar
     :ivar grad: The gradient of the scalar
@@ -16,15 +15,32 @@ class Value:
 
     def __init__(self, data, _children=(), _op=''):
         self.data = data
-        self.grad = 0.0
+        self.grad = 0
         self._prev = set(_children)
         self._op = _op
         self._backward = lambda: None
 
     def __repr__(self):
-        return f'Value(data={self.data})'
+        return f'Value(data={self.data}, grad={self.grad})'
+
+    def backward(self):
+        """
+        Calculates the gradient of this node and the gradients of its children using the chain rule.
+        First performs a topological sort on the nodes in the computational graph.
+        Then changes the gradient of the root node to 1 and propagates the gradients backwards, calling the _backward
+        function of each node.
+        """
+
+        topo = self.topological_sort()
+        self.grad = 1.0
+
+        for node in reversed(topo):
+            node._backward()
+
+    # Operator overloading
 
     def __add__(self, other):
+        other = other if isinstance(other, Value) else Value(other)
         out = Value(self.data + other.data, (self, other), '+')
 
         def _backward():
@@ -35,6 +51,7 @@ class Value:
         return out
 
     def __mul__(self, other):
+        other = other if isinstance(other, Value) else Value(other)
         out = Value(self.data * other.data, (self, other), '*')
 
         def _backward():
@@ -44,17 +61,64 @@ class Value:
         out._backward = _backward
         return out
 
-    def backward(self):
+    def __pow__(self, power):
+        assert isinstance(power, (int, float)), 'Power must be a number'
+        out = Value(self.data ** power, (self,), f'**{power}')
+
+        def _backward():
+            self.grad += (power * self.data ** (power - 1)) * out.grad
+
+        out._backward = _backward
+        return out
+
+    def tanh(self):
         """
-        Calculates the gradient of this node and the gradients of its children using the chain rule.
+        Calculates the hyperbolic tangent of this node.
         """
 
-        topo = self.topological_sort()
+        out = Value(math.tanh(self.data), (self,), 'tanh')
 
-        self.grad = 1.0
+        def _backward():
+            self.grad += (1 - out.data ** 2) * out.grad
 
-        for node in topo:
-            node._backward()
+        out._backward = _backward
+        return out
+
+    def relu(self):
+        """
+        Calculates the rectified linear unit of this node.
+        """
+        out = Value(0 if self.data < 0 else self.data, (self,), 'ReLU')
+
+        def _backward():
+            self.grad += (out.data > 0) * out.grad
+
+        out._backward = _backward
+        return out
+
+    def __neg__(self):  # -self
+        return self * -1
+
+    def __sub__(self, other):
+        return self + (-other)
+
+    def __radd__(self, other):  # other + self
+        return self + other
+
+    def __rmul__(self, other):  # other * self
+        return self * other
+
+    def __rsub__(self, other):  # other - self
+        return self - other
+
+    def __rpow__(self, other):  # other ** self
+        return self ** other
+
+    def __truediv__(self, other):  # self / other
+        return self * other ** -1
+
+    def __rtruediv__(self, other):  # other / self
+        return other * self ** -1
 
     def topological_sort(self):
         """
