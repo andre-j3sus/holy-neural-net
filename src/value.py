@@ -21,7 +21,7 @@ class Value:
         self._backward = lambda: None
 
     def __repr__(self):
-        return f'Value(data={self.data}, grad={self.grad})'
+        return f'Value(data={self.data})'
 
     def backward(self):
         """

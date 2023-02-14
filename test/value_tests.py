@@ -1,6 +1,6 @@
 import math
 
-from src.graph_utils import draw_dot
+from src.utils.graph_utils import draw_dot
 from src.value import Value
 
 
